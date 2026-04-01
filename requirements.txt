@@ -1,0 +1,8 @@
+# Core scientific computing
+numpy>=1.24.0
+
+# Plotting and visualization
+matplotlib>=3.7.0
+
+# GUI framework
+PyQt5>=5.15.0
