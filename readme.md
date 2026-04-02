@@ -91,6 +91,15 @@ python sp_visualizer.py
 - Per-algorithm panels with live time and nodes-visited charts
 - Summary tab: bar charts + speedup comparison vs Dijkstra
 
+### ⚠️ Troubleshooting: Zero Nodes Visited
+
+If you see **0 nodes visited** in the UI panels, it means the algorithm encountered an error, usually because of an incompatible configuration.
+
+**Limitations & Negative Weights:**
+- **Dijkstra Full Rerun, Ramalingam-Reps, and LPA\*** do **not** support negative weight edges.
+- If the **"Allow Negative Weights"** checkbox is selected in the GUI while these algorithms are enabled, they will instantly fail and report 0 nodes.
+- **Solution:** Either uncheck the "**Allow Negative Weights**" box, or disable the incompatible algorithms when simulating graphs with negative costs. Bellman-Ford variants are designed to correctly handle negative weights!
+
 ---
 
 ## 📖 What Is Happening in the Codebase

@@ -54,6 +54,8 @@ python sp_visualizer.py
 
 Opens the PyQt5 window. Use checkboxes to enable algorithms, sliders to configure graph size and update count, then click **▶ Run Benchmark**.
 
+> **⚠️ Note on "0 nodes visited" in GUI:** If you enable the **"Allow Negative Weights"** checkbox, algorithms that do not support negative weights (like *Dijkstra Full Rerun*, *Ramalingam-Reps*, and *LPA\**) will fail to process them. They will safely return 0 nodes to avoid crashing the visualizer. To test negative weights, properly disable incompatible algorithms and ensure only algorithms that support negative weights (like Bellman-Ford variants) are checked.
+
 ### Implemented Algorithms (in `algorithms/`)
 
 | Class | File | Neg. Weights | Dynamic |

@@ -59,6 +59,8 @@ class LPAStar:
         self.g:   dict = defaultdict(lambda: INF)
         self.rhs: dict = defaultdict(lambda: INF)
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
+        self._v_set: set = set()
 
         self._pq: list = []            # min-heap of (key, node)
         self._in_pq: dict = {}         # node -> key currently in heap
@@ -66,6 +68,7 @@ class LPAStar:
         self.rhs[source] = 0
         self._insert(source, self._key(source))
         self._compute()
+        self.visited_nodes_list = list(self._v_set)
 
     # ── Priority queue helpers ────────────────────────────────────────────────
 
@@ -110,6 +113,7 @@ class LPAStar:
                 continue   # stale heap entry
             self._in_pq.pop(u, None)
             self.nodes_visited += 1
+            self._v_set.add(u)
 
             if self.g[u] > self.rhs[u]:
                 # Underconsistent — accept the lower value
@@ -133,8 +137,10 @@ class LPAStar:
     def update(self, u: int, v: int, w_new: float) -> int:
         """Apply weight change and repair inconsistencies. Returns nodes visited."""
         self.nodes_visited = 0
+        self._v_set = set()
         self.graph.update_weight(u, v, w_new)
         # Only v's rhs is directly affected; LPA* propagates the rest.
         self._update_vertex(v)
         self._compute()
+        self.visited_nodes_list = list(self._v_set)
         return self.nodes_visited

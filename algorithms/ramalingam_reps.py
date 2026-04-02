@@ -47,6 +47,7 @@ class RamalingamReps:
         self.dist: dict = {}
         self.parent: dict = {}
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
         self._full_dijkstra()
 
     def _full_dijkstra(self) -> None:
@@ -56,12 +57,14 @@ class RamalingamReps:
         dist[self.source] = 0
         pq = [(0, self.source)]
         visited: set = set()
+        self.visited_nodes_list = []
 
         while pq:
             d, u = heapq.heappop(pq)
             if u in visited:
                 continue
             visited.add(u)
+            self.visited_nodes_list.append(u)
             for v, w in self.graph.neighbors(u).items():
                 if dist[u] + w < dist[v]:
                     dist[v] = dist[u] + w
@@ -74,12 +77,14 @@ class RamalingamReps:
     def update(self, u: int, v: int, w_new: float) -> int:
         w_old = self.graph.update_weight(u, v, w_new)
         self.nodes_visited = 0
+        self._v_set = set()
 
         if w_new <= w_old:
             self._handle_decrease(u, v, w_new)
         else:
             self._handle_increase(u, v)
 
+        self.visited_nodes_list = list(self._v_set)
         return self.nodes_visited
 
     def _handle_decrease(self, u: int, v: int, w_new: float) -> None:
@@ -97,6 +102,7 @@ class RamalingamReps:
         while pq:
             d, x = heapq.heappop(pq)
             self.nodes_visited += 1
+            self._v_set.add(x)
             if d > self.dist[x]:
                 continue   # stale heap entry
             for y, w in self.graph.neighbors(x).items():
@@ -139,6 +145,7 @@ class RamalingamReps:
         pq = []
         for node in subtree:
             self.nodes_visited += 1
+            self._v_set.add(node)
             for pred, w in self.graph.predecessors(node).items():
                 if pred not in subtree_set and self.dist[pred] != INF:
                     candidate = self.dist[pred] + w
@@ -150,6 +157,7 @@ class RamalingamReps:
         # Propagate improvements through the subtree
         while pq:
             d, x = heapq.heappop(pq)
+            self._v_set.add(x)
             if d > self.dist[x]:
                 continue
             for y, w in self.graph.neighbors(x).items():

@@ -54,6 +54,7 @@ class BellmanFordRerun:
         self.source = source
         self.dist: dict = {}
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
         self._run()
 
     def _run(self) -> None:
@@ -62,6 +63,7 @@ class BellmanFordRerun:
         dist = {i: INF for i in range(n)}
         dist[self.source] = 0
         self.nodes_visited = 0
+        v_set = set()
 
         edges = [
             (u, v, w)
@@ -73,6 +75,7 @@ class BellmanFordRerun:
             updated = False
             for u, v, w in edges:
                 self.nodes_visited += 1
+                v_set.add(u)
                 if dist[u] != INF and dist[u] + w < dist[v]:
                     dist[v] = dist[u] + w
                     updated = True
@@ -80,6 +83,7 @@ class BellmanFordRerun:
                 break
 
         self.dist = dist
+        self.visited_nodes_list = list(v_set)
 
     def update(self, u: int, v: int, w_new: float) -> int:
         self.graph.update_weight(u, v, w_new)
@@ -105,6 +109,7 @@ class DynamicBellmanFord:
         self.dist: dict = {}
         self.parent: dict = {}
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
         self._full_run()
 
     def _full_run(self) -> None:
@@ -136,12 +141,14 @@ class DynamicBellmanFord:
     def update(self, u: int, v: int, w_new: float) -> int:
         w_old = self.graph.update_weight(u, v, w_new)
         self.nodes_visited = 0
+        self._v_set = set()
 
         if w_new < w_old:
             self._propagate_decrease(u, v, w_new)
         else:
             self._propagate_increase(u, v)
 
+        self.visited_nodes_list = list(self._v_set)
         return self.nodes_visited
 
     def _propagate_decrease(self, u: int, v: int, w_new: float) -> None:
@@ -156,6 +163,7 @@ class DynamicBellmanFord:
         while changed:
             x = changed.pop()
             self.nodes_visited += 1
+            self._v_set.add(x)
             for y, w in self.graph.neighbors(x).items():
                 if self.dist[x] != INF and self.dist[x] + w < self.dist[y]:
                     self.dist[y] = self.dist[x] + w
@@ -172,6 +180,7 @@ class DynamicBellmanFord:
                 continue
             affected.add(node)
             self.nodes_visited += 1
+            self._v_set.add(node)
             for y in self.graph.neighbors(node):
                 if self.parent.get(y) == node:
                     queue.append(y)

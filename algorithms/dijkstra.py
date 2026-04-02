@@ -41,11 +41,13 @@ class DijkstraRerun:
         self.source = source
         self.dist: dict = {}
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
         self._run()
 
     def _run(self) -> None:
         """Full Dijkstra from source."""
         self.nodes_visited = 0
+        self.visited_nodes_list = []
         dist = {i: INF for i in range(self.graph.n)}
         dist[self.source] = 0
         pq = [(0, self.source)]
@@ -57,6 +59,7 @@ class DijkstraRerun:
                 continue
             visited.add(u)
             self.nodes_visited += 1
+            self.visited_nodes_list.append(u)
             for v, w in self.graph.neighbors(u).items():
                 if dist[u] + w < dist[v]:
                     dist[v] = dist[u] + w

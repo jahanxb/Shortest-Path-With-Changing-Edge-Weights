@@ -57,12 +57,14 @@ class QuantumSSSP:
         self.source = source
         self.dist: dict = {}
         self.nodes_visited: int = 0
+        self.visited_nodes_list: list = []
         self._quantum_log: list = []   # hook: append circuit results here
 
         # Run initial SSSP via the quantum stub
-        dist, count = self._quantum_run(self.graph, self.source)
+        dist, count, visited_list = self._quantum_run(self.graph, self.source)
         self.dist = dist
         self.nodes_visited = count
+        self.visited_nodes_list = visited_list
 
     def _quantum_run(self, graph: Graph, source: int):
         """
@@ -71,7 +73,7 @@ class QuantumSSSP:
 
         Expected signature:
             Input : graph  (Graph), source (int)
-            Output: (dist_dict: dict[int, float], ops_count: int)
+            Output: (dist_dict: dict[int, float], ops_count: int, visited_list: list)
 
         The stub runs classical Dijkstra and artificially reduces the
         reported node count by QUANTUM_SPEEDUP_FACTOR.
@@ -96,12 +98,13 @@ class QuantumSSSP:
 
         # Simulate quantum speedup on node-visit count only (not correctness)
         simulated_count = max(1, int(count * self.QUANTUM_SPEEDUP_FACTOR))
-        return dist, simulated_count
+        return dist, simulated_count, list(visited)
 
     def update(self, u: int, v: int, w_new: float) -> int:
         """Apply weight change and re-run the quantum algorithm."""
         self.graph.update_weight(u, v, w_new)
-        dist, count = self._quantum_run(self.graph, self.source)
+        dist, count, visited_list = self._quantum_run(self.graph, self.source)
         self.dist = dist
         self.nodes_visited = count
+        self.visited_nodes_list = visited_list
         return self.nodes_visited

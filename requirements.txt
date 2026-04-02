@@ -6,3 +6,6 @@ matplotlib>=3.7.0
 
 # GUI framework
 PyQt5>=5.15.0
+
+# Graph structures
+networkx>=3.0

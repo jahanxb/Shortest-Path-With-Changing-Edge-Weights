@@ -24,7 +24,11 @@ from algorithms import (
     RamalingamReps, LPAStar, QuantumSSSP,
 )
 
+import json
+from visualization import SimulationReplayTab
+
 import numpy as np
+import networkx as nx
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
@@ -38,7 +42,7 @@ from PyQt5.QtWidgets import (
     QGridLayout, QLabel, QSlider, QCheckBox, QPushButton, QComboBox,
     QGroupBox, QScrollArea, QFrame, QSplitter, QTabWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar,
-    QSpinBox, QSizePolicy, QTextEdit
+    QSpinBox, QSizePolicy, QTextEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon
@@ -137,6 +141,13 @@ class BenchmarkWorker(QThread):
             g_tmp.update_weight(u, v, w)
             updates.append((u, v, w))
 
+        simulation_data = {
+            "n_nodes": self.graph.n,
+            "edges": self.edges,
+            "initial_weights": [[u, v, self.graph.get_weight(u, v)] for u, v in self.edges],
+            "updates": [{"u": u, "v": v, "w_new": w, "algos": {}} for u, v, w in updates]
+        }
+
         for AlgoClass in self.algo_classes:
             if self._stop: return
             if not self.allow_negative and not AlgoClass.supports_negative:
@@ -150,18 +161,33 @@ class BenchmarkWorker(QThread):
                 continue
 
             times = []; nodes_list = []
-            for u, v, w_new in updates:
+            for i, (u, v, w_new) in enumerate(updates):
                 if self._stop: return
                 t0 = time.perf_counter()
                 try:
                     nv = algo.update(u, v, w_new)
+                    vl = getattr(algo, "visited_nodes_list", [])
                 except Exception:
                     nv = 0
+                    vl = []
                 elapsed = (time.perf_counter() - t0) * 1000
                 times.append(elapsed); nodes_list.append(nv)
                 self.result_ready.emit(AlgoClass.name, elapsed, nv)
 
+                simulation_data["updates"][i]["algos"][AlgoClass.name] = {
+                    "time_ms": elapsed,
+                    "nodes_visited_count": nv,
+                    "visited_list": vl
+                }
+
             self.run_complete.emit(AlgoClass.name, times, nodes_list)
+        
+        try:
+            with open("simulation_pattern.json", "w") as f:
+                json.dump(simulation_data, f, indent=2)
+        except Exception:
+            pass
+            
         self.status_update.emit("Complete ✓")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -635,6 +661,10 @@ class MainWindow(QMainWindow):
         self.summary_panel = SummaryPanel()
         tabs.addTab(self.summary_panel, "📈  Summary Charts")
 
+        # Tab 3 — Graph Visualization & Playback
+        self.graph_tab = SimulationReplayTab()
+        tabs.addTab(self.graph_tab, "🕸️  Simulation Replay")
+
         # Tab 3 — Complexity Table
         tabs.addTab(ComplexityTable(), "🗂  Complexity Reference")
 
@@ -695,9 +725,9 @@ class MainWindow(QMainWindow):
             parent_layout.addWidget(sld)
             return sld, val
 
-        self.sld_nodes,   self.lbl_nodes   = add_slider(gg, "Nodes",   10,  300,  60)
-        self.sld_edges,   self.lbl_edges   = add_slider(gg, "Edges",   10, 1000, 150)
-        self.sld_updates, self.lbl_updates = add_slider(gg, "Updates", 10,  200,  60)
+        self.sld_nodes,   self.lbl_nodes   = add_slider(gg, "Nodes",   4,  300,  60)
+        self.sld_edges,   self.lbl_edges   = add_slider(gg, "Edges",   4, 1000, 150)
+        self.sld_updates, self.lbl_updates = add_slider(gg, "Updates", 4,  200,  60)
         layout.addWidget(grp_graph)
 
         # ── Weight config ─────────────────────────────────────────────────────
@@ -714,8 +744,15 @@ class MainWindow(QMainWindow):
         gw.addWidget(self.cmb_mode)
         self.chk_negative = QCheckBox("Allow Negative Weights")
         self.chk_negative.setStyleSheet(f"color:{WARN}; font-weight:bold;")
+        self.chk_negative.stateChanged.connect(self._update_warning)
         gw.addWidget(self.chk_negative)
         layout.addWidget(grp_weights)
+
+        self.lbl_warning = QLabel("")
+        self.lbl_warning.setStyleSheet(f"color:{RED}; font-weight:bold; font-size:10px; padding:4px; border:1px solid {RED}; border-radius:4px; background:{PANEL_BG}; margin-top:5px;")
+        self.lbl_warning.setWordWrap(True)
+        self.lbl_warning.hide()
+        layout.addWidget(self.lbl_warning)
 
         # ── Algorithm selection ───────────────────────────────────────────────
         grp_algos = QGroupBox("🧠  Algorithms  (check to enable)")
@@ -724,19 +761,23 @@ class MainWindow(QMainWindow):
         ALGO_CLASSES = [DijkstraRerun, BellmanFordRerun, DynamicBellmanFord,
                         RamalingamReps, LPAStar, QuantumSSSP]
         for AlgoClass in ALGO_CLASSES:
+            display_name = AlgoClass.name if AlgoClass.supports_negative else f"{AlgoClass.name} (Non-negative only)"
             c = ALGO_COLORS.get(AlgoClass.name, TEXT)
             row = QHBoxLayout()
             dot = QLabel("●")
             dot.setStyleSheet(f"color:{c}; font-size:13px;")
             dot.setFixedWidth(16)
-            cb = QCheckBox(AlgoClass.name)
+            cb = QCheckBox(display_name)
             cb.setChecked(AlgoClass.name not in ["Bellman-Ford Full Rerun", "Quantum SSSP (stub)"])
             cb.setStyleSheet(f"color:{c}; font-weight:bold; font-size:10px;")
             cb.stateChanged.connect(lambda state, ac=AlgoClass: self._toggle_algo(ac, state))
+            cb.stateChanged.connect(self._update_warning)
             self.checkboxes[AlgoClass.name] = cb
             row.addWidget(dot); row.addWidget(cb); row.addStretch()
             ga.addLayout(row)
         layout.addWidget(grp_algos)
+        
+        self._update_warning()
 
         # ── Controls ──────────────────────────────────────────────────────────
         grp_ctrl = QGroupBox("▶  Controls")
@@ -798,6 +839,25 @@ class MainWindow(QMainWindow):
         sidebar_scroll.setWidget(interior)
         outer_layout.addWidget(sidebar_scroll)
         return outer
+
+    # ── Warning logic ─────────────────────────────────────────────────────────
+    def _update_warning(self):
+        if not self.chk_negative.isChecked():
+            self.lbl_warning.hide()
+            return
+            
+        incompatible_selected = []
+        for name, cb in self.checkboxes.items():
+            if cb.isChecked():
+                if name in ["Dijkstra Full Rerun", "Ramalingam-Reps (RR-SSSP)", "LPA*"]:
+                    incompatible_selected.append(name.split("(")[0].strip())
+        
+        if incompatible_selected:
+            names_str = ', '.join(incompatible_selected)
+            self.lbl_warning.setText(f"⚠️ {names_str} cannot handle negative weights. They will fail and show 0 nodes visited. Please uncheck them or disable negative weights.")
+            self.lbl_warning.show()
+        else:
+            self.lbl_warning.hide()
 
     # ── Toggle algorithm panels ───────────────────────────────────────────────
     def _toggle_algo(self, AlgoClass, state):
@@ -866,6 +926,18 @@ class MainWindow(QMainWindow):
         if not active:
             self.lbl_status.setText("Select at least one algorithm."); return
 
+        if allow_neg:
+            incompatible = [ac.name for ac in active if not ac.supports_negative]
+            if incompatible:
+                QMessageBox.warning(
+                    self, 
+                    "Incompatible Settings", 
+                    f"The following selected algorithms do not support negative weights:\n\n"
+                    f"{', '.join(incompatible)}\n\n"
+                    f"Please uncheck them or disable negative weights before running."
+                )
+                return
+
         # Ensure panels exist for all active algos
         for ac in active:
             if ac.name not in self.algo_panels:
@@ -925,6 +997,8 @@ class MainWindow(QMainWindow):
         self.btn_run.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.summary_panel.update(self.all_results)
+        if hasattr(self, 'graph_tab') and hasattr(self.graph_tab, 'load_simulation_file'):
+            self.graph_tab.load_simulation_file()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
