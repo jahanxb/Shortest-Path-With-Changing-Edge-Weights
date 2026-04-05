@@ -7,7 +7,7 @@ A research-grade benchmarking and visualization suite for **dynamic shortest-pat
 ## Project Structure
 
 ```
-├── algorithms/                  # ← Algorithm package (logic separated from UI)
+├── algorithms/                  #   Algorithm package (logic separated from UI)
 │   ├── __init__.py              #   Public API — import everything from here
 │   ├── graph.py                 #   Shared Graph data structure
 │   ├── dijkstra.py              #   Dijkstra Full Rerun (baseline)
