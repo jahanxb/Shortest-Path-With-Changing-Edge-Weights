@@ -4,7 +4,7 @@ A research-grade benchmarking and visualization suite for **dynamic shortest-pat
 
 ---
 
-## 🗂 Project Structure
+## Project Structure
 
 ```
 ├── algorithms/                  # ← Algorithm package (logic separated from UI)
@@ -25,7 +25,7 @@ A research-grade benchmarking and visualization suite for **dynamic shortest-pat
 
 ---
 
-## ⚡ Algorithms Implemented
+## Algorithms Implemented
 
 | Algorithm | Type | Handles Negatives | Per-Update Cost |
 |---|---|---|---|
@@ -41,7 +41,7 @@ A research-grade benchmarking and visualization suite for **dynamic shortest-pat
 
 ---
 
-## 🚀 Setup & Installation
+## Setup & Installation
 
 ### 1. Create a virtual environment (recommended)
 
@@ -59,7 +59,7 @@ pip install -r requirements.txt
 
 ---
 
-## ▶️ Running the Code
+## Running the Code
 
 ### CLI Benchmark (no GUI required)
 
@@ -91,7 +91,7 @@ python sp_visualizer.py
 - Per-algorithm panels with live time and nodes-visited charts
 - Summary tab: bar charts + speedup comparison vs Dijkstra
 
-### ⚠️ Troubleshooting: Zero Nodes Visited
+### Troubleshooting: Zero Nodes Visited
 
 If you see **0 nodes visited** in the UI panels, it means the algorithm encountered an error, usually because of an incompatible configuration.
 
@@ -102,7 +102,7 @@ If you see **0 nodes visited** in the UI panels, it means the algorithm encounte
 
 ---
 
-## 📖 What Is Happening in the Codebase
+## What Is Happening in the Codebase
 
 ### `algorithms/` — The Algorithm Package
 
@@ -152,7 +152,7 @@ Imports algorithms from `algorithms/` and runs benchmarks in a background `QThre
 
 ---
 
-## 📊 Benchmark Test Cases
+## Benchmark Test Cases
 
 See **[BENCHMARK.md](BENCHMARK.md)** for:
 
@@ -165,7 +165,7 @@ See **[BENCHMARK.md](BENCHMARK.md)** for:
 
 ---
 
-## 🔌 Adding a New Algorithm
+## Adding a New Algorithm
 
 1. Create `algorithms/my_algo.py` implementing the standard interface:
    ```python
@@ -190,7 +190,7 @@ See **[BENCHMARK.md](BENCHMARK.md)** for:
 
 ---
 
-## 📚 References
+## References
 
 - Ramalingam, G. & Reps, T. (1996). *An incremental algorithm for a generalization of the shortest-path problem.* J. Algorithms.
 - Koenig, S. & Likhachev, M. (2002). *D\* Lite.* AAAI.
