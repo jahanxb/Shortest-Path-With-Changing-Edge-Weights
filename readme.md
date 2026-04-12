@@ -1,5 +1,5 @@
 # Shortest Path With Changing Edge Weights
-
+Dynamic SSSP 
 A research-grade benchmarking and visualization suite for **dynamic shortest-path algorithms** - algorithms that efficiently update shortest paths as edge weights change (increase, decrease, or go negative) without recomputing from scratch every time.
 
 ---
