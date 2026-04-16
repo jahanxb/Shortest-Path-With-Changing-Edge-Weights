@@ -218,7 +218,7 @@ Where A is a penalty coefficient that enforces path validity constraints. The qu
 Framework used: **D-Wave Ocean SDK** (compatible with D-Wave quantum annealers).
 
 **Current status:** QUBO formulation is complete and verified against classical TD-Dijkstra at t=0 and t=50. At t=30 the annealer returns a suboptimal path (v0→v2→v5→v6→v7→v8, 29.6 min vs optimal 25.27 min) due to the PLF spike on e(v1,v6) creating a complex energy landscape. Full quantum implementation and hardware testing are pending.
-
+quantum
 ---
 
 ## References
