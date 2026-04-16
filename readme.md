@@ -1,199 +1,230 @@
-# Shortest Path With Changing Edge Weights
-Main Branch -> Merge to master 
-A research-grade benchmarking and visualization suite for **dynamic shortest-path algorithms** - algorithms that efficiently update shortest paths as edge weights change (increase, decrease, or go negative) without recomputing from scratch every time.
+# Shortest Paths with Changing Edge Weights
+**Group 2 — CS 691 Algorithm Design & Analysis**
+Muhammad Jahanzeb Khan · Md Nazmul Hoque · Hassan Mahmoud
+University of Alabama
+
+---
+
+## What This Project Does
+
+This project benchmarks three classical algorithms that solve the **Time-Dependent Shortest Path Problem (TDSPP)** — finding the fastest route between two nodes in a road network where edge costs change over time. We also include a quantum annealing formulation of the same problem using a QUBO encoding.
+
+The key difference from regular shortest path: in a time-dependent network, the cost of an edge is not a fixed number. It is a **piecewise linear function (PLF)** of the time you arrive at that edge. So if you leave later, the same road might be faster or slower depending on traffic conditions at that moment.
 
 ---
 
 ## Project Structure
 
 ```
-├── algorithms/                  #   Algorithm package (logic separated from UI)
-│   ├── __init__.py              #   Public API — import everything from here
-│   ├── graph.py                 #   Shared Graph data structure
-│   ├── dijkstra.py              #   Dijkstra Full Rerun (baseline)
-│   ├── bellman_ford.py          #   Bellman-Ford Full Rerun + Dynamic variant
-│   ├── ramalingam_reps.py       #   Ramalingam-Reps dynamic SSSP (RR-SSSP)
-│   ├── lpa_star.py              #   LPA* — Lifelong Planning A*
-│   └── quantum_sssp.py          #   Quantum SSSP stub (plug-in point)
+├── algorithms/
+│   ├── __init__.py          — registers all three algorithms
+│   ├── graph.py             — graph data structure + PLF evaluation
+│   ├── td_dijkstra.py       — TD-Dijkstra (baseline)
+│   ├── td_astar.py          — TD-A* (heuristic-guided)
+│   └── td_g_tree.py         — TD-G-Tree (index-based)
 │
-├── dynamic_sp_benchmark.py      # CLI benchmark runner (Scenarios A-D)
-├── sp_visualizer.py             # PyQt5 GUI with live charts
-├── BENCHMARK.md                 # Full test-case catalogue & scoring matrix
-├── requirements.txt             # Python dependencies
-└── readme.md                    # This file
+├── benchmark.py             — terminal benchmark, prints results table
+├── gui.py                   — PyQt5 GUI with graph visualization and charts
+└── README.md                — this file
 ```
 
 ---
 
-## Algorithms Implemented
+## The Graph We Used
 
-| Algorithm | Type | Handles Negatives | Per-Update Cost |
+A 9-node time-dependent road network with 11 bidirectional edges. The graph has four time-varying edges whose costs change depending on when you travel, and seven fixed-cost edges that always cost the same.
+
+```
+Nodes: v0, v1, v2, v3, v4, v5, v6, v7, v8
+Source: v0
+Destination: v8
+```
+
+**Edge weights — (Time, Weight) breakpoints:**
+
+| Edge | PLF Points | Type |
+|---|---|---|
+| e(v0, v1) | {(0,4), (60,4)} | Fixed — always 4 min |
+| e(v0, v2) | {(0,8), (60,8)} | Fixed — always 8 min |
+| e(v1, v2) | {(0,8), (20,8), (35,20), (60,20)} | Time-varying — rises after t=20 |
+| e(v1, v6) | {(0,5), (20,5), (30,18), (60,5)} | Time-varying — **spikes at t=30** |
+| e(v2, v3) | {(0,15), (60,15)} | Fixed — always 15 min |
+| e(v2, v5) | {(0,5), (60,5)} | Fixed — always 5 min |
+| e(v3, v4) | {(0,6), (60,6)} | Fixed — always 6 min |
+| e(v3, v5) | {(0,22), (20,22), (35,6), (60,6)} | Time-varying — drops after t=20 |
+| e(v5, v6) | {(0,8), (25,8), (45,12), (60,12)} | Time-varying — rises from t=25 |
+| e(v6, v7) | {(0,2), (60,2)} | Fixed — always 2 min |
+| e(v7, v8) | {(0,3), (60,3)} | Fixed — always 3 min |
+
+**How PLF costs work:** The breakpoints give you the cost at specific times. For any time in between, the cost is linearly interpolated. For example, e(v1,v6) at t=34 falls between (30,18) and (60,5), so the cost is 18 + (34-30) × (5-18)/(60-30) = **16.27 min**.
+
+**We tested three departure times:**
+- **t = 0** — off-peak, all edges cheap
+- **t = 30** — peak congestion, e(v1,v6) spikes to ~16.27 min at actual arrival
+- **t = 50** — recovering, e(v1,v6) costs 7.6 min at actual arrival
+
+---
+
+## Algorithms
+
+### TD-Dijkstra — Dreyfus, 1969
+The baseline algorithm. Works exactly like standard Dijkstra except edge costs are evaluated at the actual arrival time at each node, not the original departure time. Always picks the node reachable in the least time and expands from there.
+
+**Complexity:** O((V + E) log V · f) where f = max PLF breakpoints per edge
+
+**On our graph:** 7–9 nodes settled per query depending on departure time.
+
+### TD-A* — Zhao et al., 2008
+Same as TD-Dijkstra but adds a precomputed lower-bound heuristic h(v) for every node — the minimum possible remaining time to the destination from that node. This steers the search toward the destination and avoids wasting time expanding nodes that are clearly going the wrong way. Because h(v) never overestimates, the algorithm still returns the exact optimal answer.
+
+The heuristic is built once using a reverse Dijkstra with the minimum possible cost per edge. Node priority = arrival time + h(v).
+
+**Heuristic values for our graph:**
+
+| Node | h(v) | Reason |
+|---|---|---|
+| v8 | 0 | Already at destination |
+| v7 | 3 | v7→v8 minimum cost |
+| v6 | 5 | v6→v7→v8 |
+| v1 | 7 | v1→v6→v7→v8 |
+| v5 | 13 | v5→v6→v7→v8 |
+| v3, v4 | high | Far from destination — pruned |
+
+**Complexity:** O((V + E) log V · f) — same asymptotic, fewer nodes in practice
+
+**On our graph:** Consistently settles only 5 nodes regardless of departure time.
+
+### TD-G-Tree — Wang, Li, Tang (PVLDB 2019)
+Index-based algorithm. Instead of searching the full graph at every query, it does the expensive work once offline. The graph is split into clusters, border nodes (nodes whose edges cross cluster boundaries) are identified, and travel times between all border pairs are precomputed and stored in a matrix. At query time, only border nodes are touched — internal cluster nodes are never visited.
+
+**Our graph has 4 clusters:**
+
+| Cluster | Nodes | Border Nodes |
+|---|---|---|
+| Source cluster | v0, v1, v2 | v1, v2 |
+| Destination cluster | v6, v7, v8 | v6 |
+| Bottom cluster | v3, v4 | v3 |
+| Connector | v5 | v5 |
+
+**Why local_dijkstra is used:** The source and destination nodes (v0 and v8) are not border nodes themselves. A short Dijkstra restricted to nodes inside a single cluster is used to travel from v0 to its cluster's border nodes, and from the destination cluster's border node v6 to v8. These internal searches are fast because each cluster is small.
+
+**Query steps:**
+1. local_dijkstra from v0 to source cluster borders v1, v2
+2. Matrix lookup: best arrival at destination cluster border v6 (comparing via v1 directly, or via v2→v5→v6)
+3. local_dijkstra from v6 to v8 inside destination cluster
+
+**Complexity:** O(log²(κf) · V · log²f) per query where κf = tree fanout
+
+**On our graph:** v3, v4 are never visited at t=0 and t=50. At t=30, v4 is never visited.
+
+---
+
+## Results
+
+All three algorithms find the same optimal path for all three departure times:
+
+**Path: v0 → v1 → v6 → v7 → v8**
+
+| | t = 0 | t = 30 | t = 50 |
 |---|---|---|---|
-| **Dijkstra Full Rerun** | Baseline | ❌ | O((V+E) log V) |
-| **Bellman-Ford Full Rerun** | Baseline | ✅ | O(V · E) |
-| **Dynamic Bellman-Ford** | Incremental | ✅ | O(k · E) |
-| **Ramalingam-Reps (RR-SSSP)** | Fully Dynamic | ❌ | O(k log V) |
-| **LPA\*** | Fully Dynamic | ❌ | O(k log V) |
-| **Quantum SSSP** | Stub / Plug-in | ✅\* | O(√(V·E))\* |
+| **TD-Dijkstra** | 14.00 min | 25.27 min | 16.60 min |
+| **TD-A*** | 14.00 min | 25.27 min | 16.60 min |
+| **TD-G-Tree** | 14.00 min | 25.27 min | 16.60 min |
 
-> `k` = number of nodes whose shortest distance actually changes after an update.  
-> \* Quantum entry is a stub backed by classical Dijkstra. See `algorithms/quantum_sssp.py` for the integration guide.
+**Why t=30 is the hardest case:** When departing at t=30, you arrive at v1 at t=34. The edge e(v1,v6) is evaluated at t=34 (not t=30), giving 16.27 min due to the PLF spike. The alternative route via v2→v5→v6 costs 8+5+11.6=24.6 min just to reach v6, making the direct v1→v6 route still faster at 4+16.27=20.27 min.
 
----
+**Nodes visited comparison:**
 
-## Setup & Installation
-
-### 1. Create a virtual environment (recommended)
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate        # macOS / Linux
-# .venv\Scripts\activate         # Windows
-```
-
-### 2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
+| | t = 0 | t = 30 | t = 50 |
+|---|---|---|---|
+| TD-Dijkstra | v0,v1,v2,v6,v7,v5,v8 | all 9 nodes | v0,v1,v2,v6,v5,v7,v8 |
+| TD-A* | v0,v1,v6,v7,v8 only | v0,v1,v6,v7,v8 only | v0,v1,v6,v7,v8 only |
+| TD-G-Tree | skips v3,v4,v5 | skips v4 | skips v3,v4 |
 
 ---
 
-## Running the Code
+## How to Run
 
-### CLI Benchmark (no GUI required)
+### Requirements
 
-Runs all 5 algorithms across 4 scenarios and prints a full comparison table:
-
-```bash
-python dynamic_sp_benchmark.py
+```
+PyQt5
+matplotlib
+numpy
 ```
 
-**Output includes:**
-- Per-algorithm timing (total ms, average ms per update)
-- Nodes visited (average and max per update)
-- Correctness % vs Dijkstra ground truth
-- Speedup bar chart vs the Dijkstra baseline
+Install with:
+```bash
+pip install PyQt5 matplotlib numpy
+```
 
-### GUI Visualizer (interactive)
+### Terminal Benchmark
 
-Opens a PyQt5 window with live charts, algorithm toggles, and a summary dashboard:
+Prints a full results table for all three algorithms at t=0, t=30, t=50:
 
 ```bash
-python sp_visualizer.py
+python benchmark.py
+```
+
+Output includes travel time, nodes settled, and query time in milliseconds for each algorithm and each departure time.
+
+### GUI
+
+Opens an interactive window with the graph visualization, bar charts, and a per-departure-time results table:
+
+```bash
+python gui.py
 ```
 
 **GUI features:**
-- Checkboxes to enable/disable individual algorithms
-- Sliders for node count, edge count, and number of updates
-- Dropdown for weight-change mode: mixed / decrease / increase / traffic
-- Toggle for negative weights (enables BF-family only)
-- Per-algorithm panels with live time and nodes-visited charts
-- Summary tab: bar charts + speedup comparison vs Dijkstra
-
-### Troubleshooting: Zero Nodes Visited
-
-If you see **0 nodes visited** in the UI panels, it means the algorithm encountered an error, usually because of an incompatible configuration.
-
-**Limitations & Negative Weights:**
-- **Dijkstra Full Rerun, Ramalingam-Reps, and LPA\*** do **not** support negative weight edges.
-- If the **"Allow Negative Weights"** checkbox is selected in the GUI while these algorithms are enabled, they will instantly fail and report 0 nodes.
-- **Solution:** Either uncheck the "**Allow Negative Weights**" box, or disable the incompatible algorithms when simulating graphs with negative costs. Bellman-Ford variants are designed to correctly handle negative weights!
+- Graph panel showing node positions, time-varying edges (dashed orange), and optimal paths highlighted after running
+- Algorithm checkboxes to enable or disable individual algorithms
+- Bar charts for average query time (ms) and average nodes settled
+- Summary table with travel time per departure time per algorithm
+- Edge Weight Functions tab showing all four PLF curves with departure time markers
 
 ---
 
-## What Is Happening in the Codebase
+## Algorithm Complexity on Our Graph
 
-### `algorithms/` — The Algorithm Package
+| Algorithm | Formula | Our graph (V=9, E=11, f=4) |
+|---|---|---|
+| TD-Dijkstra | O((V+E)·log V·f) | ≈ 254 operations |
+| TD-A* | O((V+E)·log V·f) | ≈ 141 in practice (5 nodes) |
+| TD-G-Tree | O(log²(κf)·V·log²f) | ≈ 324 (saves on large graphs) |
+| Quantum (QUBO) | O(\|E\|·\|T\|) variables | 660 QUBO variables |
 
-All algorithm logic lives here, **completely separated** from the GUI and runner code. Every algorithm exposes the same interface:
+Note: TD-G-Tree appears more expensive on 9 nodes because its advantage is at scale. On networks with thousands of nodes and many repeated queries, the border-only traversal becomes dramatically faster than full graph search.
 
-```python
-# Initialise (runs SSSP once from scratch)
-algo = DijkstraRerun(graph, source=0)
+---
 
-# Apply an edge weight change incrementally
-nodes_visited = algo.update(u=2, v=5, w_new=3.7)
+## Quantum Annealing Approach — *[PENDING]*
 
-# Read current shortest distances
-print(algo.dist[7])   # distance from source to node 7
+The quantum formulation of TDSPP encodes the problem as a QUBO (Quadratic Unconstrained Binary Optimization) using time-indexed binary variables:
+
+```
+x_{ij}^t = 1  if edge (i,j) is used at time t
+x_{ij}^t = 0  otherwise
 ```
 
-**`algorithms/graph.py`** — `Graph` class with `add_edge`, `update_weight`, `neighbors`, `predecessors`, and `clone`. Uses two adjacency dicts (forward + reverse) so predecessor lookups are O(degree).
+The full Hamiltonian is:
 
-**`algorithms/dijkstra.py`** — Baseline. Full Dijkstra rerun (`O((V+E) log V)`) after every change. Correct only for non-negative weights.
+```
+H_P = H_cost + A·H_source + A·H_dest + A·H_flow
+```
 
-**`algorithms/bellman_ford.py`** — Two classes:
-- `BellmanFordRerun` — full rerun, `O(VE)`, handles negatives.
-- `DynamicBellmanFord` — incremental; weight decreases forward-propagate via BFS, weight increases invalidate the dependent subtree then recompute.
+Where A is a penalty coefficient that enforces path validity constraints. The quantum annealer finds the ground state of H_P, which corresponds to the optimal path.
 
-**`algorithms/ramalingam_reps.py`** — Maintains an explicit shortest-path tree. On decrease: Dijkstra-style local relaxation. On increase: subtree invalidation + seeded priority-queue repair. `O(k log V)` per update.
+Framework used: **D-Wave Ocean SDK** (compatible with D-Wave quantum annealers).
 
-**`algorithms/lpa_star.py`** — Lifelong Planning A\*. Maintains `g` (current distance) and `rhs` (one-step lookahead) per node. Processes only *inconsistent* nodes (`g ≠ rhs`). `O(k log k)` per update.
-
-**`algorithms/quantum_sssp.py`** — Plug-in stub. Classical Dijkstra with simulated 40% node-visit reduction. Replace `_quantum_run()` to wire in a real quantum backend.
-
-### `dynamic_sp_benchmark.py` — CLI Benchmark Runner
-
-Imports all algorithms from `algorithms/` and runs four scenarios:
-
-| Scenario | Graph Type | Update Mode | Notes |
-|---|---|---|---|
-| A | Random (Erdős-Rényi) | mixed ↑↓ | Small / Medium / Large |
-| B | Grid (road network) | traffic spikes | Simulates rush hour |
-| C | Layered dense | mixed | Worst-case SPT disruption |
-| D | Random with negatives | mixed | BF algorithms only |
-
-Each scenario clones the original graph for every algorithm so they all receive identical edge-weight update sequences. Correctness is verified against a fresh Dijkstra ground truth after every single update.
-
-### `sp_visualizer.py` — PyQt5 GUI
-
-Imports algorithms from `algorithms/` and runs benchmarks in a background `QThread` so the UI stays responsive. Emits signals per update so each algorithm's panel updates in real time.
-
----
-
-## Benchmark Test Cases
-
-See **[BENCHMARK.md](BENCHMARK.md)** for:
-
-- Per-algorithm **breaking test cases** (exact graph structures that expose bugs or limitations)
-- **Suite A** — 10 small-graph correctness tests (V ≤ 10)
-- **Suite B** — 10 large-graph scalability tests (V up to 1 M)
-- **Suite C** — 10 dynamic weight-change scenarios
-- **Suite D** — 10 negative-weight and negative-cycle tests
-- **Scoring matrix** (40 tests × 8 algorithms) to fill after running benchmarks
-
----
-
-## Adding a New Algorithm
-
-1. Create `algorithms/my_algo.py` implementing the standard interface:
-   ```python
-   from algorithms.graph import Graph, INF
-
-   class MyAlgo:
-       name = "My Algorithm"
-       supports_negative = False  # or True
-
-       def __init__(self, graph: Graph, source: int): ...
-       def update(self, u: int, v: int, w_new: float) -> int: ...
-       # .dist must be a dict[int, float]
-   ```
-
-2. Export it from `algorithms/__init__.py`:
-   ```python
-   from algorithms.my_algo import MyAlgo
-   __all__ = [..., "MyAlgo"]
-   ```
-
-3. Add it to `ALGORITHMS` in `dynamic_sp_benchmark.py` and to `ALGO_MAP` in `sp_visualizer.py`.
+**Current status:** QUBO formulation is complete and verified against classical TD-Dijkstra at t=0 and t=50. At t=30 the annealer returns a suboptimal path (v0→v2→v5→v6→v7→v8, 29.6 min vs optimal 25.27 min) due to the PLF spike on e(v1,v6) creating a complex energy landscape. Full quantum implementation and hardware testing are pending.
 
 ---
 
 ## References
 
-- Ramalingam, G. & Reps, T. (1996). *An incremental algorithm for a generalization of the shortest-path problem.* J. Algorithms.
-- Koenig, S. & Likhachev, M. (2002). *D\* Lite.* AAAI.
-- Koenig, S. & Likhachev, M. (2004). *Lifelong Planning A\*.* Artificial Intelligence.
-- Dürr, C. et al. (2006). *Quantum query complexity of some graph problems.* SIAM J. Comput.
-- Johnson, D. B. (1977). *Efficient algorithms for shortest paths in sparse networks.* J. ACM.
+- Wang, Y., Li, G., & Tang, N. (2019). Querying Shortest Paths on Time Dependent Road Networks. *PVLDB*, 12(11), 1249–1261.
+- Zhao, X. et al. (2008). Time-dependent heuristic search for routing in dynamic road networks.
+- Dreyfus, S. E. (1969). An appraisal of some shortest-path algorithms. *Operations Research*, 17(3), 395–412.
+- Papalitsas, C. et al. (2019). A QUBO model for the traveling salesman problem with time windows. *Algorithms*, 12(11), 224.
+- Krauss, T. & McCollum, J. (2020). Solving the network shortest path problem on a quantum annealer. *IEEE Transactions on Quantum Engineering*, 1, 1–12.
