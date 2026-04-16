@@ -1,8 +1,8 @@
 # Shortest Paths with Changing Edge Weights
 
-Group 2 — CS 570 Algorithm Design and Analysis
- Md Nazmul Hoque, Muhammad Jahanzeb Khan, Hassan Mahmoud
-University of Alabama
+## Group 2 — CS 570 Algorithm Design and Analysis
+### Md Nazmul Hoque, Muhammad Jahanzeb Khan, Hassan Mahmoud
+#### University of Alabama
 
 ---
 
@@ -14,7 +14,7 @@ University of Alabama
 
 ## What This Project Does
 
-This project benchmarks three classical algorithms and one quantum annealing formulation for the Time-Dependent Shortest Path Problem (TDSPP) — finding the fastest route between two nodes in a road network where edge costs change over time depending on when you travel.
+This project benchmarks three classical algorithms and one quantum annealing formulation for the Time-Dependent Shortest Path Problem (TDSPP), finding the fastest route between two nodes in a road network where edge costs change over time depending on when you travel.
 
 The key difference from a regular shortest path problem: the cost of an edge is not a fixed number. It is a piecewise linear function of the time you arrive at that edge. Leave later and the same road might be faster or slower depending on traffic conditions at that moment.
 
@@ -118,7 +118,7 @@ H_P = H_cost + A * H_source + A * H_dest + A * H_flow
 
 where A = 100 satisfies A > max edge cost = 30, guaranteeing constraint feasibility.
 
-Edge costs in the QUBO are evaluated using a step function. This is a discrete approximation of the PLF — costs are exact only when arrival times coincide with PLF breakpoints. Between breakpoints the step function holds the previous breakpoint value, which can cause the solver to select a different path than the classical algorithms. See the Known Limitation section below.
+Edge costs in the QUBO are evaluated using a step function. This is a discrete approximation of the PLF, costs are exact only when arrival times coincide with PLF breakpoints. Between breakpoints the step function holds the previous breakpoint value, which can cause the solver to select a different path than the classical algorithms. See the Known Limitation section below.
 
 ---
 
