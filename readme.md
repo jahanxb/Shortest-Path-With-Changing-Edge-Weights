@@ -180,7 +180,7 @@ TD-G-Tree looks more expensive on 9 nodes because its advantage only appears on 
 
 ---
 
-## Quantum Annealing — Known Limitation
+## Quantum Annealing (Known Limitation)
 
 The QUBO formulation requires discrete costs. The step function approximation of the PLF evaluates edge costs by holding the value at the last breakpoint, overestimating costs at non-breakpoint arrival times. This is the fundamental tension between the continuous PLF model and the discrete QUBO encoding.
 
